@@ -30,18 +30,37 @@ ipcMain.on("hud-overlay-ignore-mouse-events", (_event, ignore: boolean) => {
 	}
 });
 
-ipcMain.on("hud-overlay-move-by", (_event, deltaX: number, deltaY: number) => {
+let hudOverlaySize: Pick<Electron.Rectangle, "width" | "height"> | null = null;
+let hudDragStartBounds: Electron.Rectangle | null = null;
+ipcMain.on("hud-overlay-start-drag", () => {
+	hudDragStartBounds =
+		hudOverlayWindow && !hudOverlayWindow.isDestroyed()
+			? { ...hudOverlayWindow.getBounds(), ...hudOverlaySize }
+			: null;
+});
+
+ipcMain.on("hud-overlay-drag-to", (_event, offsetX: number, offsetY: number) => {
 	if (
 		!hudOverlayWindow ||
 		hudOverlayWindow.isDestroyed() ||
-		!Number.isFinite(deltaX) ||
-		!Number.isFinite(deltaY)
+		!hudDragStartBounds ||
+		!Number.isFinite(offsetX) ||
+		!Number.isFinite(offsetY)
 	) {
 		return;
 	}
 
-	const [x, y] = hudOverlayWindow.getPosition();
-	hudOverlayWindow.setPosition(Math.round(x + deltaX), Math.round(y + deltaY), false);
+	const bounds = hudDragStartBounds;
+	// Anchor the entire drag to its initial bounds. Reading rounded Windows bounds
+	// back on every move accumulates DPI rounding and grows this transparent window.
+	hudOverlayWindow.setBounds(
+		{
+			...bounds,
+			x: Math.round(bounds.x + offsetX),
+			y: Math.round(bounds.y + offsetY),
+		},
+		false,
+	);
 });
 
 // Resize the HUD to fit its rendered content. Anchored by its bottom-centre so it
@@ -64,6 +83,9 @@ ipcMain.on("hud-overlay-set-size", (_event, width: number, height: number) => {
 	const { workArea } = screen.getDisplayMatching(bounds);
 	const nextWidth = Math.min(workArea.width, Math.max(1, Math.round(width)));
 	const nextHeight = Math.min(workArea.height, Math.max(1, Math.round(height)));
+
+	// Keep requested DIP dimensions; reading them back can round up at fractional DPI.
+	hudOverlaySize = { width: nextWidth, height: nextHeight };
 
 	if (bounds.width === nextWidth && bounds.height === nextHeight) {
 		return;
@@ -143,10 +165,14 @@ export function createHudOverlayWindow(): BrowserWindow {
 	});
 
 	hudOverlayWindow = win;
+	hudOverlaySize = { width: windowWidth, height: windowHeight };
+	hudDragStartBounds = null;
 
 	win.on("closed", () => {
 		if (hudOverlayWindow === win) {
 			hudOverlayWindow = null;
+			hudOverlaySize = null;
+			hudDragStartBounds = null;
 		}
 	});
 

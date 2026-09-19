@@ -400,8 +400,11 @@ export function LaunchWindow() {
 		[observeHudElement],
 	);
 
+	const dragStartPositionRef = useRef<{ x: number; y: number } | null>(null);
 	const hudMouseEventsEnabledRef = useRef<boolean | undefined>(undefined);
 	const setHudMouseEventsEnabled = useCallback((enabled: boolean) => {
+		// A window move can fire leave events before pointer-up. Keep receiving the drag.
+		if (!enabled && dragStartPositionRef.current) return;
 		if (hudMouseEventsEnabledRef.current === enabled) {
 			return;
 		}
@@ -475,24 +478,24 @@ export function LaunchWindow() {
 			setMicrophoneEnabled(!microphoneEnabled);
 		}
 	};
-	const dragLastPositionRef = useRef<{ x: number; y: number } | null>(null);
 	const handleHudDragPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
 		event.preventDefault();
 		event.stopPropagation();
 		setHudMouseEventsEnabled(true);
 		event.currentTarget.setPointerCapture(event.pointerId);
-		dragLastPositionRef.current = { x: event.screenX, y: event.screenY };
+		dragStartPositionRef.current = { x: event.screenX, y: event.screenY };
+		window.electronAPI?.startHudOverlayDrag?.();
 	};
 	const handleHudDragPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-		const lastPosition = dragLastPositionRef.current;
-		if (!lastPosition) return;
-		const deltaX = event.screenX - lastPosition.x;
-		const deltaY = event.screenY - lastPosition.y;
-		dragLastPositionRef.current = { x: event.screenX, y: event.screenY };
-		window.electronAPI?.moveHudOverlayBy?.(deltaX, deltaY);
+		const startPosition = dragStartPositionRef.current;
+		if (!startPosition) return;
+		window.electronAPI?.dragHudOverlayTo?.(
+			event.screenX - startPosition.x,
+			event.screenY - startPosition.y,
+		);
 	};
 	const handleHudDragPointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
-		dragLastPositionRef.current = null;
+		dragStartPositionRef.current = null;
 		if (event.currentTarget.hasPointerCapture(event.pointerId)) {
 			event.currentTarget.releasePointerCapture(event.pointerId);
 		}
@@ -701,7 +704,7 @@ export function LaunchWindow() {
 				ref={setHudBarEl}
 				data-hud-interactive="true"
 				data-tray-layout={trayLayout}
-				className={`fixed bottom-5 left-1/2 -translate-x-1/2 flex rounded-2xl border border-white/[0.10] bg-[#07080a]/90 shadow-[0_20px_60px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl backdrop-saturate-[140%] ${
+				className={`fixed bottom-5 left-1/2 -translate-x-1/2 flex rounded-2xl border border-white/[0.10] bg-[#07080a]/90 shadow-[0_4px_12px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl backdrop-saturate-[140%] ${
 					trayLayout === "vertical"
 						? "max-h-[calc(100vh-2.5rem)] flex-col items-center gap-1 overflow-y-auto px-1 py-1.5"
 						: "items-center gap-1.5 px-2 py-1.5"
