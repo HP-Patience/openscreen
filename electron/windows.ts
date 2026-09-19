@@ -95,8 +95,15 @@ ipcMain.on("hud-overlay-set-size", (_event, width: number, height: number) => {
 	const bottomY = bounds.y + bounds.height;
 
 	hudOverlayWindow.setBounds({
-		x: Math.round(centerX - nextWidth / 2),
-		y: Math.round(bottomY - nextHeight),
+		// Expansion near an edge must not place onboarding/actions outside the display.
+		x: Math.max(
+			workArea.x,
+			Math.min(workArea.x + workArea.width - nextWidth, Math.round(centerX - nextWidth / 2)),
+		),
+		y: Math.max(
+			workArea.y,
+			Math.min(workArea.y + workArea.height - nextHeight, Math.round(bottomY - nextHeight)),
+		),
 		width: nextWidth,
 		height: nextHeight,
 	});
