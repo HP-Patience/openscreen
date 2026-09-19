@@ -1,0 +1,11 @@
+Openscreen 本地兼容处理（2026-09-19）
+
+安装目录：E:\openscreen
+版本：1.5.0
+发现：用户录屏目录有三个 0 字节 MP4；直接运行原生捕获器，在报告 Recording started 后，发送 stop 仍不能在 20 秒内结束，测试文件为 0 字节。
+处理：将 resources\electron\native\bin\win32-x64\wgc-capture.exe 改名为 wgc-capture.exe.disabled-20260919，原文件 SHA256 已核对一致。未修改 app.asar、驱动、设置或已有录屏。
+原理：当前安装包代码在原生 helper 缺失时已有 getDisplayMedia / MediaRecorder 备用路径。
+验证边界：确认改名成功及备用路径代码存在，未完成切换后应用界面的实际录制和导出验证。原生故障更深层原因尚未确定。
+下一步：退出并重新打开 Openscreen，选择整个屏幕，录制 5 秒后停止，检查能否进入编辑器及播放。先保持摄像头和麦克风关闭以减少变量。
+恢复：退出 Openscreen，将 wgc-capture.exe.disabled-20260919 改回 wgc-capture.exe 即可。
+注意：后续软件更新可能恢复原生 helper；原 0 字节文件没有可恢复的视频内容。
